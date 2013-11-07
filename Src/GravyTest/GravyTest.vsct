@@ -45,7 +45,8 @@
     <Groups>
 
       <Group guid="guidGravyTestCmdSet" id="groupGravyTestContextMenu" priority="0x0600">
-        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS"/>
+        <!--<Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS"/>-->
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE" />
       </Group>
       
 
@@ -65,8 +66,11 @@
           If you do not want an image next to your command, remove the Icon node or set it to <Icon guid="guidOfficeIcon" id="msotcidNoIcon" /> -->
 
       <Button guid="guidGravyTestCmdSet" id="cmdidAddWhenCase" priority="0x0100" type="Button">
-        <Parent guid="guidGravyTestCmdSet" id="groupGravyTestContextMenu" />
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_PROJ_MISCADD" />
         <Icon guid="guidImages" id="bmpPic1" />
+        <CommandFlag>DynamicVisibility</CommandFlag>
+        <CommandFlag>DefaultInvisible</CommandFlag>
+        <CommandFlag>DefaultDisabled</CommandFlag>
         <Strings>
           <CommandName>cmdidAddWhenCase</CommandName>
           <ButtonText>AddWhenCase</ButtonText>
@@ -92,7 +96,11 @@
 
 
 
-
+  <CommandPlacements>
+    <CommandPlacement guid="guidGravyTestCmdSet" id="cmdidAddWhenCase" priority="0x9000">
+      <Parent guid="guidGravyTestCmdSet" id="groupGravyTestContextMenu"/>
+    </CommandPlacement>
+  </CommandPlacements>
 
   <Symbols>
     <!-- This is the package guid. -->

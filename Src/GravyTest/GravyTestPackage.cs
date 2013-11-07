@@ -3,10 +3,9 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.ComponentModel.Design;
-using Microsoft.Win32;
+
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell.Interop;
-using Microsoft.VisualStudio.OLE.Interop;
 using Microsoft.VisualStudio.Shell;
 
 namespace Gravypowered.GravyTest
@@ -41,7 +40,7 @@ namespace Gravypowered.GravyTest
         /// </summary>
         public GravyTestPackage()
         {
-            Trace.WriteLine(string.Format(CultureInfo.CurrentCulture, "Entering constructor for: {0}", this.ToString()));
+            Trace.WriteLine(string.Format(CultureInfo.CurrentCulture, "Entering constructor for: {0}", this));
         }
 
 
@@ -60,16 +59,14 @@ namespace Gravypowered.GravyTest
             base.Initialize();
 
             // Add our command handlers for menu (commands must exist in the .vsct file)
-            OleMenuCommandService mcs = GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
+            var mcs = GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
             if ( null != mcs )
             {
-               
+                // Create the command for the menu item.
+                var menuCommandId = new CommandID(GuidList.guidGravyTestCmdSet, (int)PkgCmdIDList.cmdidAddWhenCase);
+                var menuItem = new MenuCommand(MenuItemCallback, menuCommandId );
+                mcs.AddCommand( menuItem );
             }
-
-            // Create the command for the menu item.
-            CommandID menuCommandID = new CommandID(GuidList.guidGravyTestCmdSet, (int)PkgCmdIDList.cmdidAddWhenCase);
-            MenuCommand menuItem = new MenuCommand(MenuItemCallback, menuCommandID);
-            mcs.AddCommand(menuItem);
         }
         #endregion
 
@@ -84,11 +81,11 @@ namespace Gravypowered.GravyTest
             IVsUIShell uiShell = (IVsUIShell)GetService(typeof(SVsUIShell));
             Guid clsid = Guid.Empty;
             int result;
-            Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(uiShell.ShowMessageBox(
+            ErrorHandler.ThrowOnFailure(uiShell.ShowMessageBox(
                        0,
                        ref clsid,
                        "GravyTest",
-                       string.Format(CultureInfo.CurrentCulture, "Inside {0}.MenuItemCallback()", this.ToString()),
+                       string.Format(CultureInfo.CurrentCulture, "Inside {0}.MenuItemCallback()", this),
                        string.Empty,
                        0,
                        OLEMSGBUTTON.OLEMSGBUTTON_OK,
