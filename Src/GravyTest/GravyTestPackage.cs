@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.ComponentModel.Design;
-
 using Microsoft.VisualStudio;
-using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
 
 namespace Gravypowered.GravyTest
 {
@@ -23,12 +23,14 @@ namespace Gravypowered.GravyTest
     // This attribute tells the PkgDef creation utility (CreatePkgDef.exe) that this class is
     // a package.
     [PackageRegistration(UseManagedResourcesOnly = true)]
-    // This attribute is used to register the informations needed to show the this package
+    // This attribute is used to register the information needed to show this package
     // in the Help/About dialog of Visual Studio.
     [InstalledProductRegistration("#110", "#112", "1.0", IconResourceID = 400)]
     // This attribute is needed to let the shell know that this package exposes some menus.
     [ProvideMenuResource("Menus.ctmenu", 1)]
+    // This attribute registers a tool window exposed by this package.
     [Guid(GuidList.guidGravyTestPkgString)]
+    [ProvideAutoLoad("f1536ef8-92ec-443c-9ed7-fdadf150da82")]
     public sealed class GravyTestPackage : Package
     {
         /// <summary>
@@ -40,60 +42,158 @@ namespace Gravypowered.GravyTest
         /// </summary>
         public GravyTestPackage()
         {
-            Trace.WriteLine(string.Format(CultureInfo.CurrentCulture, "Entering constructor for: {0}", this));
+            Debug.WriteLine(CultureInfo.CurrentCulture.ToString(), "Entering constructor for: {0}", this);
         }
 
-
-
         /////////////////////////////////////////////////////////////////////////////
-        // Overriden Package Implementation
+        // Overridden Package Implementation
         #region Package Members
 
         /// <summary>
         /// Initialization of the package; this method is called right after the package is sited, so this is the place
-        /// where you can put all the initilaization code that rely on services provided by VisualStudio.
+        /// where you can put all the initialization code that rely on services provided by VisualStudio.
         /// </summary>
         protected override void Initialize()
         {
-            Trace.WriteLine (string.Format(CultureInfo.CurrentCulture, "Entering Initialize() of: {0}", this.ToString()));
+            Debug.WriteLine (CultureInfo.CurrentCulture.ToString(), "Entering Initialize() of: {0}", this);
             base.Initialize();
 
             // Add our command handlers for menu (commands must exist in the .vsct file)
             var mcs = GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
-            if ( null != mcs )
-            {
-                // Create the command for the menu item.
-                var menuCommandId = new CommandID(GuidList.guidGravyTestCmdSet, (int)PkgCmdIDList.cmdidAddWhenCase);
-                var menuItem = new MenuCommand(MenuItemCallback, menuCommandId );
-                mcs.AddCommand( menuItem );
-            }
+            if (null == mcs) return;            
+
+            // Create the command for the menu item.
+            var menuContextCommandID = new CommandID(GuidList.guidGravyTestCmdSet, (int)PkgCmdIDList.cmdidAddAnd);
+            var menuItem = new OleMenuCommand(OnAddTransformCommand, OnChangeAddTransformMenu, OnBeforeQueryStatusAddTransformCommand, menuContextCommandID);
+            mcs.AddCommand( menuItem );
         }
         #endregion
 
-        /// <summary>
-        /// This function is the callback used to execute a command when the a menu item is clicked.
-        /// See the Initialize method to see how the menu item is associated to this function using
-        /// the OleMenuCommandService service and the MenuCommand class.
-        /// </summary>
-        private void MenuItemCallback(object sender, EventArgs e)
+        private static void OnAddTransformCommand(object sender, EventArgs e)
         {
-            // Show a Message Box to prove we were here
-            IVsUIShell uiShell = (IVsUIShell)GetService(typeof(SVsUIShell));
-            Guid clsid = Guid.Empty;
-            int result;
-            ErrorHandler.ThrowOnFailure(uiShell.ShowMessageBox(
-                       0,
-                       ref clsid,
-                       "GravyTest",
-                       string.Format(CultureInfo.CurrentCulture, "Inside {0}.MenuItemCallback()", this),
-                       string.Empty,
-                       0,
-                       OLEMSGBUTTON.OLEMSGBUTTON_OK,
-                       OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST,
-                       OLEMSGICON.OLEMSGICON_INFO,
-                       0,        // false
-                       out result));
         }
+
+        private static void OnChangeAddTransformMenu(object sender, EventArgs e) { }
+
+        private static void OnBeforeQueryStatusAddTransformCommand(object sender, EventArgs e)
+        {
+            // get the menu that fired the event
+            var menuCommand = sender as OleMenuCommand;
+            if (menuCommand != null)
+            {
+                menuCommand.Visible = false;
+                menuCommand.Enabled = false;
+
+                IVsHierarchy hierarchy = null;
+                uint itemid = VSConstants.VSITEMID_NIL;
+
+                if (!IsSingleProjectItemSelection(out hierarchy, out itemid))
+                {
+                    return;
+                }
+
+                IVsProject vsProject = (IVsProject)hierarchy;
+                if (!ProjectSupportsTransforms(vsProject))
+                {
+                    return;
+                }
+
+                string itemFullPath;
+
+                if (ErrorHandler.Failed(vsProject.GetMkDocument(itemid, out itemFullPath)))
+                {
+                    return;
+                }
+
+                var pattern = @"TestFixture.cs";
+
+                if (!string.IsNullOrEmpty(itemFullPath))
+                {
+                    var fi = new System.IO.FileInfo(itemFullPath);
+                    var regex = new System.Text.RegularExpressions.Regex( pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (!regex.IsMatch(fi.Name)) return;
+                }
+
+                menuCommand.Visible = true;
+                menuCommand.Enabled = true;
+                
+            }
+        }
+
+        public static bool IsSingleProjectItemSelection(out IVsHierarchy hierarchy, out uint itemid)
+        {
+            hierarchy = null;
+            itemid = VSConstants.VSITEMID_NIL;
+            int hr = VSConstants.S_OK;
+
+            IVsMonitorSelection monitorSelection = Package.GetGlobalService(typeof(SVsShellMonitorSelection)) as IVsMonitorSelection;
+            IVsSolution solution = Package.GetGlobalService(typeof(SVsSolution)) as IVsSolution;
+            if (monitorSelection == null || solution == null)
+            {
+                return false;
+            }
+
+            IVsMultiItemSelect multiItemSelect = null;
+            IntPtr hierarchyPtr = IntPtr.Zero;
+            IntPtr selectionContainerPtr = IntPtr.Zero;
+
+            try
+            {
+                hr = monitorSelection.GetCurrentSelection(out hierarchyPtr, out itemid, out multiItemSelect, out selectionContainerPtr);
+
+                if (ErrorHandler.Failed(hr) || hierarchyPtr == IntPtr.Zero || itemid == VSConstants.VSITEMID_NIL)
+                {
+                    // there is no selection
+                    return false;
+                }
+
+                if (multiItemSelect != null)
+                {
+                    // multiple items are selected
+                    return false;
+                }
+
+                if (itemid == VSConstants.VSITEMID_ROOT)
+                {
+                    // there is a hierarchy root node selected, thus it is not a single item inside a project
+                    return false;
+                }
+
+                hierarchy = Marshal.GetObjectForIUnknown(hierarchyPtr) as IVsHierarchy;
+                if (hierarchy == null)
+                {
+                    return false;
+                }
+
+                Guid guidProjectID = Guid.Empty;
+
+                if (ErrorHandler.Failed(solution.GetGuidOfProject(hierarchy, out guidProjectID)))
+                {
+                    return false; // hierarchy is not a project inside the Solution if it does not have a ProjectID Guid
+                }
+
+                // if we got this far then there is a single project item selected
+                return true;
+            }
+            finally
+            {
+                if (selectionContainerPtr != IntPtr.Zero)
+                {
+                    Marshal.Release(selectionContainerPtr);
+                }
+
+                if (hierarchyPtr != IntPtr.Zero)
+                {
+                    Marshal.Release(hierarchyPtr);
+                }
+            }
+        }
+
+        private static bool ProjectSupportsTransforms(IVsProject project)
+        {
+            return true;
+        }
+
 
     }
 }

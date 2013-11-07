@@ -60,5 +60,22 @@ namespace Gravypowered.GravyTest {
             }
         }
         
+        /// <summary>
+        ///   Looks up a localized string similar to Can not create tool window..
+        /// </summary>
+        internal static string CanNotCreateWindow {
+            get {
+                return ResourceManager.GetString("CanNotCreateWindow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to My Tool Window.
+        /// </summary>
+        internal static string ToolWindowTitle {
+            get {
+                return ResourceManager.GetString("ToolWindowTitle", resourceCulture);
+            }
+        }
     }
 }
