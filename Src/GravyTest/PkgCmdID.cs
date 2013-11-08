@@ -6,7 +6,7 @@ namespace Gravypowered.GravyTest
 {
     static class PkgCmdIDList
     {
-        public const uint cmdidAddAnd =        0x100;
+        public const uint cmdidAddAnd = 0x100;
 
     };
 }
